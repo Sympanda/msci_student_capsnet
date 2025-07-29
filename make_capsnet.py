@@ -83,8 +83,15 @@ class BetaCapsNet(nn.Module):
             stride=2,
         )
 
+        # Compute output spatial shape of PrimaryCaps
+        kernel_size = 7
+        stride = 2
+        H_out = (image_size - kernel_size) // stride + 1
+        W_out = (image_size - kernel_size) // stride + 1
+        num_input_capsules = num_primary_capsules * H_out * W_out
+
         self.attention_caps = SelfAttentionCapsules(
-            num_input_capsules=num_primary_capsules * 6 * 6,  # Make dynamic later
+            num_input_capsules=num_input_capsules,
             num_output_capsules=1,
             input_dim=primary_caps_dim,
             output_dim=output_caps_dim,
