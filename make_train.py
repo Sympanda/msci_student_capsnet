@@ -46,9 +46,10 @@ def train_mnist_capsnet(config):
 
     # Load MNIST
     transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.5,), (0.5,))
-    ])
+    transforms.Resize((128, 128)),
+    transforms.ToTensor(),
+    transforms.Normalize((0.5,), (0.5,))
+        ])
     train_ds = MNIST(root="./data", train=True, transform=transform, download=True)
     test_ds = MNIST(root="./data", train=False, transform=transform, download=True)
     train_loader = DataLoader(train_ds, batch_size=config["batch_size"], shuffle=True)
