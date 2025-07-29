@@ -77,7 +77,7 @@ def train_mnist_capsnet(config):
         for x, _ in tqdm(train_loader, desc=f"Epoch {epoch+1}"):
             x = x.to(device)
             optimizer.zero_grad()
-            recon, mean, logvar = model(x)
+            recon, mean, logvar = model(x, return_latent=True)
             beta = beta_scheduler.step()
             recon_loss, total_loss, kl_loss = custom_loss(x, recon, mean, logvar, beta)
             total_loss.backward()
