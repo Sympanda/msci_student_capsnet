@@ -150,6 +150,7 @@ def train_galaxy_capsnet(config):
     for epoch in range(config["epochs"]):
         for x in tqdm(train_loader, desc=f"Epoch {epoch+1}"):
             x = x.to(device)
+            print(x.shape)
             optimizer.zero_grad()
             recon, mean, logvar = model(x)
             beta = beta_scheduler.step()
