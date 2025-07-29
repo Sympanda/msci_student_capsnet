@@ -77,7 +77,7 @@ def train_mnist_capsnet(config):
         for x, _ in tqdm(train_loader, desc=f"Epoch {epoch+1}"):
             x = x.to(device)
             optimizer.zero_grad()
-            recon, mean, logvar = model(x, return_latent=True)
+            recon, mean, logvar = model(x)
             beta = beta_scheduler.step()
             recon_loss, total_loss, kl_loss = custom_loss(x, recon, mean, logvar, beta)
             total_loss.backward()
@@ -113,4 +113,76 @@ def train_mnist_capsnet(config):
         latent_dim=config["latent_dim"],
         steps=5,
         save_path="mnist_latent_effects.png"
+    )
+
+import h5py
+
+class GalaxyZooH5Dataset(torch.utils.data.Dataset):
+    def __init__(self, h5_path):
+        with h5py.File(h5_path, 'r') as f:
+            self.x = f['images'][:]  # shape [N, 128, 128, 3]
+        self.x = torch.tensor(self.x).permute(0, 3, 1, 2).float()
+        self.x = (self.x / 255.0 - 0.5) * 2  # normalize to [-1, 1]
+
+    def __len__(self): return self.x.shape[0]
+    def __getitem__(self, i): return self.x[i]
+
+def train_galaxy_capsnet(config):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    train_ds = GalaxyZooH5Dataset(config["train_data_path"])
+    test_ds = GalaxyZooH5Dataset(config["test_data_path"])
+    train_loader = DataLoader(train_ds, batch_size=config["batch_size"], shuffle=True)
+    test_loader = DataLoader(test_ds, batch_size=config["batch_size"], shuffle=False)
+
+    model = build_model_from_config(config).to(device)
+    optimizer = optim.Adam(model.parameters(), lr=config["lr"], weight_decay=config.get("weight_decay", 1e-5))
+    beta_scheduler = BetaScheduler(start_beta=config["beta_start"], max_beta=config["beta_max"], steps=config["beta_steps"])
+
+    def custom_loss(x, x_recon, mean, logvar, beta):
+        x = (x + 1) / 2
+        x_recon = (x_recon + 1) / 2
+        recon_loss = F.binary_cross_entropy(x_recon, x, reduction='sum')
+        total_loss, kl_loss = loss_function(recon_loss, mean, logvar, beta)
+        return recon_loss, total_loss, kl_loss
+
+    step = 0
+    for epoch in range(config["epochs"]):
+        for x in tqdm(train_loader, desc=f"Epoch {epoch+1}"):
+            x = x.to(device)
+            optimizer.zero_grad()
+            recon, mean, logvar = model(x, return_latent=True)
+            beta = beta_scheduler.step()
+            recon_loss, total_loss, kl_loss = custom_loss(x, recon, mean, logvar, beta)
+            total_loss.backward()
+            optimizer.step()
+
+            if step % 100 == 0:
+                print(f"[{epoch+1}/{config['epochs']}] Step {step} | Recon: {recon_loss.item():.2f}, KL: {kl_loss.item():.2f}, Total: {total_loss.item():.2f}")
+            step += 1
+
+    torch.save(model.state_dict(), config.get("model_save_path", "capsnet_galaxy.pth"))
+
+    # Evaluate + plot RGB reconstructions
+    model.eval()
+    with torch.no_grad():
+        test_images = next(iter(test_loader))[:8].to(device)
+        recons, _, _ = model(test_images)
+
+    fig, axes = plt.subplots(2, 8, figsize=(12, 3))
+    for i in range(8):
+        axes[0, i].imshow(test_images[i].cpu().permute(1, 2, 0).clamp(-1, 1).add(1).div(2).numpy())
+        axes[0, i].axis("off")
+        axes[1, i].imshow(recons[i].cpu().permute(1, 2, 0).clamp(-1, 1).add(1).div(2).numpy())
+        axes[1, i].axis("off")
+    plt.tight_layout()
+    plt.show()
+
+    # Latent visualization
+    visualize_latent_space_effects(
+        model,
+        test_images[0].cpu(),
+        latent_dim=config["latent_dim"],
+        steps=5,
+        save_path="galaxy_latent_effects.png"
     )
