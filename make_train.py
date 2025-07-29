@@ -8,7 +8,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import numpy as np
 from beta_loss import BetaScheduler, CyclicalBetaScheduler, kl_divergence, loss_function
-from capnet import CapsuleNetwork  # replace with your actual model path
+from make_capsnet import build_model_from_config  # replace with your actual model path
 
 def visualize_latent_space_effects(capsnet, test_image, latent_dim=16, steps=5, perturbation_range=2.5, save_path="latent_effects.png"):
     capsnet.eval()
@@ -55,13 +55,7 @@ def train_mnist_capsnet(config):
     test_loader = DataLoader(test_ds, batch_size=config["batch_size"], shuffle=False)
 
     # Model
-    model = CapsuleNetwork(
-        in_channels=1,
-        feature_dim=config.get("feature_dim", 256),
-        num_primary_capsules=config.get("num_primary_capsules", 28),
-        primary_caps_dim=config.get("capsule_dim", 8),
-        output_caps_dim=config["latent_dim"]
-    ).to(device)
+    model = build_model_from_config(config).to(device)
 
     # Optimizer
     optimizer = optim.Adam(model.parameters(), lr=config["lr"], weight_decay=config.get("weight_decay", 1e-5))
